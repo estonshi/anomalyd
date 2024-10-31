@@ -1,0 +1,24 @@
+connector:
+  - name: vm-source
+    class: Victoriametrics
+    pipeline: reader
+    params:
+      datasource_url: http://192.168.163.17:8427/
+      tenant_id: '1000'
+      user: vmselect
+      password: select@ed4Q10
+  - name: mq-pulsar
+    class: Pulsar
+    pipeline: writer
+    params:
+      datasource_url: pulsar://192.168.163.17:6650
+      jwt_token: eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.QbSh6qUG_yQN7vNcRkk4_8C2nXw5ions_G29qmZXW1BXifaamSowCNHTt1pPgh1RoFlu7xzuZ2K0NCfi9Q7a1-hybMWokr-Z06DlzVx48HS3qjZ7hwNv1QOU5EkfVNekqI-zRj6ROioMIoEGliwrOM8M-Eu-EClKYt1zrRFwnETkNZml_DU1O5GRPF1pEq_BZcpoX-NbFKXPf8Doh8ko6Lw2Z8qsr40H4McGBzPw4Q-b56Rr4_OEgas7U_UNWCLvsiHuDBpW6Jbmjl6iNckG7WeiOyLL8xi2KNVyQSjYMz8G0ko1qraBH5NQfepiqnFTOfek4nTL4eZ6WLXiThC19g
+      target_topic: persistent://dev/alerts/tp_anomalyd_result
+
+model:
+  - name: prophet
+    class: Prophet
+
+scheduler:
+  - name: periodical
+    class: Periodical

@@ -1,0 +1,1 @@
+from model._interface import BaseModel, InferResult
