@@ -1,0 +1,7 @@
+- name: anomalyd_os.cpu.usage
+  query: os.cpu.usage{__resourceId="1856597897719447553"}
+  fit_period: 200000
+  fit_step: 300
+  infer_period: 300
+  infer_step: 300
+  

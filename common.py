@@ -1,16 +1,36 @@
 import sys
+import os
 import hashlib
 import re
 
+home_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+task_folder = None
+model_folder = None
+output_metrics_prefix = "_model_output"
+
+def check_home_folder(specified_home_folder = None):
+    global home_folder, task_folder, model_folder
+    if specified_home_folder is not None:
+        if not os.path.isdir(specified_home_folder):
+            raise IOError("Unknown home path : %s", specified_home_folder)
+        home_folder = specified_home_folder
+    task_folder = os.path.join(home_folder, 'task')
+    model_folder = os.path.join(home_folder, 'model')
+    if not os.path.isdir(home_folder):
+        os.makedirs(home_folder)
+    if not os.path.isdir(task_folder):
+        os.mkdir(task_folder)
+    if not os.path.isdir(model_folder):
+        os.mkdir(model_folder)
 
 def map_hash(map : dict) -> str :
     raw_str = ""
     for k in sorted(map):
-        raw_str += k + ":" + map[k] + ";"
+        raw_str += str(k) + ":" + str(map[k]) + ";"
     return hashlib.md5(raw_str.encode(encoding='utf-8')).hexdigest()
 
 def check_time_range_str(time_range : str):
-    return re.match(r'^([0-9])+(s|m|h|d|w)+$', time_range)
+    return re.match(r'^([0-9])+(s|m|h|d|w)+$', time_range) is not None
     
 def parse_time_range_str(time_range : str) -> int :
     '''

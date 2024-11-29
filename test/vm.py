@@ -7,17 +7,16 @@ import time
 import pandas as pd
 from urllib.parse import urljoin
 from typing import Tuple, Dict, Any, List
-import connector._interface as _interface
 
 sys.path.append("..")
 import common
 
 logger = logging.getLogger(__name__)
 
-class Victoriametrics(_interface.Connector):
+class Victoriametrics():
     def __init__(self,
                  datasource_url = "http://localhost:8481/",
-                 multi_tenant = True,
+                 tenant_id= None,
                  health_path = "health",
                  user_query = None,
                  pwd_query = None,
@@ -26,7 +25,7 @@ class Victoriametrics(_interface.Connector):
                  timeout = "30s"
                  ) -> None:
         self.datasource_url = datasource_url
-        self.multi_tenant = multi_tenant
+        self.tenant_id = tenant_id
         self.user_query = user_query
         self.pwd_query = pwd_query
         self.user_insert = user_insert
@@ -65,38 +64,38 @@ class Victoriametrics(_interface.Connector):
                     return
                 time.sleep(120)
 
-    def __get_ingest_url(self, tenant):
-        if self.multi_tenant:
-            return self.datasource_url + "insert/" + tenant + "/prometheus/api/v1/import/prometheus"
+    def __get_ingest_url(self):
+        if self.tenant_id is not None and len(self.tenant_id) > 0:
+            return self.datasource_url + "insert/" + self.tenant_id + "/prometheus/api/v1/import/prometheus"
         else:
             return self.datasource_url + "api/v1/import/prometheus"
         
-    def __get_query_url(self, tenant):
-        if self.multi_tenant:
-            return self.datasource_url + "select/" + tenant + "/prometheus/api/v1/query_range"
+    def __get_query_url(self):
+        if self.tenant_id is not None and len(self.tenant_id) > 0:
+            return self.datasource_url + "select/" + self.tenant_id + "/prometheus/api/v1/query_range"
         else:
             return self.datasource_url + "api/v1/query_range"
 
     def check_query_args(self, args : dict[str,Any]):
         return super().check_query_args(args=args)
 
-    def query_series(self, tenant : str, query_name : str, queries : str, sampling_period : str, query_length: str) -> Tuple[Dict[str,pd.DataFrame],Dict[str,Dict[str,str]]] :
+    def query_series(self, query_name : str, queries : str, sampling_period : str, query_length: str) -> Tuple[Exception,Dict[str,pd.DataFrame],Dict[str,Dict[str,str]]] :
         if self.down:
-            raise ValueError("[CONFIG](Victoriametrics) datasource is down")
+            return ValueError("[CONFIG](Victoriametrics) datasource is down"), None, None
         if not (common.check_time_range_str(sampling_period) and \
             common.check_time_range_str(query_length)):
-            raise ValueError("[CONFIG](Victoriametrics) 'sampling_period' or 'query_length' is invalid: {}, {}".format(sampling_period, query_length))
+            return ValueError("[CONFIG](Victoriametrics) 'sampling_period' or 'query_length' is invalid: {}, {}".format(sampling_period, query_length)), None, None
         end = time.time()
         start = end - common.parse_time_range_str(query_length)
         queries_params = {"query": queries, "start": start, "end": end, "step": sampling_period}
-        url = self.__get_query_url(tenant)
+        url = self.__get_query_url()
         headers = {"Accept-Encoding":"gzip, deflate"}
         if self.user_query is not None:
             headers['Authorization'] = 'Basic ' + base64.b64encode(f"{self.user_query}:{self.pwd_query}".encode("utf-8")).decode("ascii")
         res = requests.get(url=url, params=queries_params, headers=headers, timeout=common.parse_time_range_str(self.timeout))
         data = res.json()
         if data["data"]["result"] is None or len(data["data"]["result"]) == 0 :
-            return None, None
+            return ValueError("No data returned"), None, None
         result : Dict[str,pd.DataFrame] = {}
         labels : Dict[str,Dict[str,str]] = {}
         for metric in data["data"]["result"]:
@@ -110,19 +109,19 @@ class Victoriametrics(_interface.Connector):
             result[sid] = df
             label.pop('__name__')
             labels[sid] = label
-        return result, labels
+        return None, result, labels
         
-    def insert_series(self, tenant : str, metrics : List[str], labels : List[dict], values : List[dict[str,str]]) -> bool:
+    def insert_series(self, query_names : List[str], labels : List[dict], values : List[dict[str,str]]) -> bool:
         if self.down:
             return False
         data_total = []
-        url = self.__get_ingest_url(tenant)
-        for idx, metric in enumerate(metrics):
+        url = self.__get_ingest_url()
+        for idx, query_name in enumerate(query_names):
             label = labels[idx]
             value = values[idx]
             label_s = "{" + ",".join([k+"=\""+v+"\"" for k,v in label.items()]) + "}"
             for time_s, val in value.items():
-                data = metric.strip() + label_s + " " + val + " " + time_s
+                data = query_name.strip() + label_s + " " + val + " " + time_s
                 data_total.append(data)
         headers = {"Accept-Encoding":"gzip, deflate", "Content-Type": "text/plain"}
         if self.user_insert is not None:
@@ -132,6 +131,6 @@ class Victoriametrics(_interface.Connector):
             logger.warning("Insert to VM failed: status_code = %d", res.status_code)
             return False
         else:
-            return True
+            return True      
 
             

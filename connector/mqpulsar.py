@@ -7,7 +7,7 @@ import pandas as pd
 import connector._interface as _interface
 
 sys.path.append("..")
-import tools
+import common
 
 class Pulsar(_interface.Connector):
     def __init__(self,
@@ -34,7 +34,7 @@ class Pulsar(_interface.Connector):
     def __valid_inputs(self) -> None:
         if not re.match(r'^(pulsar://)([a-zA-Z0-9.-])+:([0-9])+/?', self.datasource_url):
             raise ValueError("[CONFIG](Pulsar) 'datasource_url' is invalid")
-        if not tools.check_time_range_str(self.timeout):
+        if not common.check_time_range_str(self.timeout):
             raise ValueError("[CONFIG](Pulsar) 'timeout' is invalid")
         
     def __init_conn(self) -> None:
@@ -43,26 +43,26 @@ class Pulsar(_interface.Connector):
             auth = pulsar.AuthenticationToken(self.jwt_token)
         self.client = pulsar.Client(service_url=self.datasource_url, 
                                authentication=auth,
-                               operation_timeout_seconds=tools.parse_time_range_str(self.timeout), 
-                               connection_timeout_ms=tools.parse_time_range_str(self.timeout)*1000)
+                               operation_timeout_seconds=common.parse_time_range_str(self.timeout), 
+                               connection_timeout_ms=common.parse_time_range_str(self.timeout)*1000)
         if self.target_topic is not None:
             self.producer = self.client.create_producer(topic=self.target_topic, 
-                                                        send_timeout_millis=tools.parse_time_range_str(self.timeout)*1000)
+                                                        send_timeout_millis=common.parse_time_range_str(self.timeout)*1000)
             
     def check_query_args(self, args: dict[str, Any]):
         return False
             
-    def query_series(self, query_name : str, queries : str, sampling_period : str, query_length: str) -> Tuple[Exception,Dict[str,pd.DataFrame],Dict[str,Dict[str,str]]] :
-        return RuntimeError("[CONFIG](Pulsar) Pulsar cannot query metrics !"), None, None
+    def query_series(self, tenant : str, query_name : str, queries : str, sampling_period : str, query_length: str) -> Tuple[Dict[str,pd.DataFrame],Dict[str,Dict[str,str]]] :
+        raise RuntimeError("[CONFIG](Pulsar) Pulsar cannot query metrics !")
 
-    def insert_series(self, query_names : List[str], labels : List[dict], values : List[dict[str,str]]) -> bool:
+    def insert_series(self, tenant : str, metrics : List[str], labels : List[dict], values : List[dict[str,str]]) -> bool:
         data_total = []
-        for idx, query_name in enumerate(query_names):
+        for idx, metric in enumerate(metrics):
             label = labels[idx]
             value = values[idx]
             label_s = "{" + ",".join([k+"=\""+v+"\"" for k,v in label.items()]) + "}"
             for time_s, val in value:
-                data = query_name.strip() + label_s + " " + val + " " + time_s
+                data = metric.strip() + label_s + " " + val + " " + time_s
                 data_total.append(data)
         try:
             self.producer.send("\n".join(data_total))

@@ -1,0 +1,8 @@
+pyyaml==6.0.1
+jupyter==1.1.1
+flask==2.2.5
+pandas==2.2.3
+prophet==1.1.6
+requests==2.31.0
+urllib3==2.1.0
+pulsar-client==3.4.0

@@ -1,5 +1,7 @@
 import yaml
 import argparse
+import logging
+import sys
 
 from connector import *
 from model import *
@@ -16,8 +18,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description = "anamoly detection service")
     parser.add_argument("-c", "--config", type=str, help="config file path, default is config.yaml", default="config.yaml")
-    parser.add_argument("-m", "--home", type=str, help="Home folder, default is current folder", default=None)
-    parser.add_argument("-p", "--web.listen-address", type=int, help="address on which to expose web interface, default 8450", default=8450)
+    parser.add_argument("-m", "--home", type=str, help="Home folder, default is 'data' folder in current path", default=None)
+    parser.add_argument("-p", "--port", type=int, help="address on which to expose web interface, default 8450", default=8450)
     args = parser.parse_args()
 
     configs = load_config(args.config)
@@ -26,17 +28,21 @@ if __name__ == "__main__":
     models : dict[str, BaseModel] = {}
     schedulers : dict[str, Scheduler] = {}
 
+    # define logging config
+    logging.basicConfig(level = logging.INFO, format = '%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
+
     for cnt in configs['connector']:
-        if cnt['pipeline'] == 'reader':
+        if 'reader' in cnt['pipeline']:
             readers[cnt['name']] = globals()[cnt['class']](**cnt['params'])
-        elif cnt['pipeline'] == 'writer':
+        if 'writer' in cnt['pipeline']:
             writers[cnt['name']] = globals()[cnt['class']](**cnt['params'])
     for m in configs['model']:
         models[m['name']] = globals()[m['class']]()
     for sch in configs['scheduler']:
-        schedulers[sch['name']] = globals()[m['class']]()
+        schedulers[sch['name']] = globals()[sch['class']]()
 
     handler.init_global_configs(args.home, reader=readers, writer=writers, model=models, scheduler = schedulers)
-    handler.start_app()
+    handler.resume_task()
+    handler.start_app(args.port)
 
     

@@ -1,5 +1,5 @@
 import sys
-import _interface
+import model._interface as _interface
 import uuid
 from typing import Any, Dict, List, Tuple
 from prophet import Prophet
@@ -8,7 +8,7 @@ import pandas as pd
 import logging
 
 sys.path.append("..")
-
+logger = logging.getLogger(__name__)
 
 class ProphetModel(_interface.BaseModel):
 
@@ -26,8 +26,9 @@ class ProphetModel(_interface.BaseModel):
         return True
     
     def create_instance(self, args : dict[str,Any]) -> str:
-        instance_id = uuid.uuid().hex
+        instance_id = uuid.uuid4()
         self.instances_args[instance_id] = args
+        self.instances[instance_id] = {}
         return instance_id
 
     def remove_instance(self, instance_id : str) -> bool:
@@ -38,15 +39,17 @@ class ProphetModel(_interface.BaseModel):
         return True
     
     def infer(self, instance : str, y : Dict[str, pd.DataFrame]) -> Dict[str, _interface.InferResult]:
+        if instance not in self.instances:
+            return None
         series_map = self.instances[instance]
-        if series_map is None:
+        if len(series_map) == 0:
             return None
         result_map : Dict[str, _interface.InferResult] = {}
         for series_id, df in y.items():
-            model = series_map[series_id]
-            if model is None:
+            if series_id not in series_map:
                 continue
-            predicted = model.predict(df['ds'])
+            model = series_map[series_id]
+            predicted = model.predict(df[['ds']])
             score = self.__evaluate_anomaly_score(predicted, df)
             result = _interface.InferResult(series_id, list(predicted['ds']), list(df['y']), 
                                             list(predicted['yhat']), list(predicted['yhat_lower']),
@@ -59,22 +62,20 @@ class ProphetModel(_interface.BaseModel):
         return list(score)
     
     def fit(self, instance : str, y : Dict[str, pd.DataFrame]) -> bool:
-        if self.instances_args[instance] is None:
+        if instance not in self.instances_args:
             return False
-        if self.instances[instance] is None:
+        if instance not in self.instances:
             self.instances[instance] = {}
-        try:
-            model = Prophet(**self.instances_args[instance])
-        except Exception as e:
-            logging.error("[ProphetModel](Fit) invalid model parameters ! error : %s", e)
-            return False
         for series_id, data in y.items():
             if not ('y' in data.columns and 'ds' in data.columns):
-                logging.error("[ProphetModel](Fit) invalid fit dataset (series_id=%s), lack of columns", series_id)
+                logger.error("[ProphetModel](Fit) invalid fit dataset (series_id=%s), lack of columns", series_id)
                 continue
             try:
-                self.instances[instance][series_id] = model.fit(y)
+                model = Prophet(**self.instances_args[instance])
+                model.fit(data)
+                self.instances[instance][series_id] = model
             except Exception as e:
-                logging.error("[ProphetModel](Fit) fitting error : %s", e)
-                continue
+                logger.error("[ProphetModel](Fit) fitting error : %s", e)
+                return False
+        return True
             

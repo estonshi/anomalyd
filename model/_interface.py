@@ -3,6 +3,11 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 
 class InferResult():
+
+    '''
+    self.data是一个dataframe，列包含：['ds', 'y', 'yhat', 'yhat_lower', 'yhat_upper', 'anomaly_score']
+    '''
+
     def __init__(self, series_id : str, ds : List[int], y : List[float], yhat : List[float], 
                  yhat_lower : List[float], yhat_upper : List[float], anomaly_score : List[float],
                  extra_metrics : dict[str, List[Any]]) -> None:
@@ -22,18 +27,16 @@ class InferResult():
         metrics_names = []
         values = []
         for column in self.data.columns:
-            if str(column) == 'ds':
+            if str(column) in ['ds']:
                 continue
             metrics_name = metrics_prefix + "_" + column
             value = {}
-            for i in self.data.index:
-                ts = self.data['ds'][i]
-                v = self.data[column][i]
-                value[str(ts)] = str(v)
+            ts_sec = self.data['ds'].astype('int64').divide(1e9)
+            value = self.data[column]
+            to_write = {str(k):str(v) for k,v in zip(ts_sec, value)}
             metrics_names.append(metrics_name)
-            values.append(value)
-        query_labels['for'] = query_name
-        query_labels['series'] = series_id
+            values.append(to_write)
+        query_labels['__for'] = query_name
         labels = [query_labels] * len(metrics_names)
         return metrics_names, values, labels
 

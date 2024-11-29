@@ -13,20 +13,22 @@ class Scheduler(metaclass=ABCMeta):
 
     @abstractmethod
     def schedule(self, name : str, 
+                 tenant : str,
                  reader : Connector, 
                  writer : Connector,
                  model : BaseModel,
-                 model_instance_id : str, 
+                 model_args : Dict[str,Any], 
                  query: dict[str, dict[str,Any]],
                  args : dict[str, str]) -> None:
         '''
-        query : {query_name : {query_args_key : query_args_value}}
-        args : {schedule_args_key : schedule_args_value}
+        模型参数 model_args : {model_args_name : model_args_value}
+        查询参数 query : {query_name : {query_args_key : query_args_value}}
+        调度参数 args : {schedule_args_key : schedule_args_value}
         '''
         pass
 
     @abstractmethod
-    def stop(self, name : str):
+    def stop(self, name : str) -> bool:
         pass
 
 
@@ -38,6 +40,7 @@ class ScheduledTask():
         args: scheduler.args
     '''
     def __init__(self, name : str,
+                 tenant : str,
                  reader : Connector, 
                  writer : Connector, 
                  model : BaseModel, 
@@ -50,6 +53,7 @@ class ScheduledTask():
         args : {schedule_args_key : schedule_args_value}
         '''
         self.name = name
+        self.tenant = tenant
         self.reader = reader
         self.writer = writer
         self.model = model
@@ -58,13 +62,13 @@ class ScheduledTask():
         self.args = args
         self.next_trigger_t = next_trigger_t
 
-    def __gt__(self, other : ScheduledTask):
+    def __gt__(self, other):
         return self.next_trigger_t > other.next_trigger_t
     
-    def __lt__(self, other : ScheduledTask):
+    def __lt__(self, other):
         return self.next_trigger_t < other.next_trigger_t
     
-    def __eq__(self, other : ScheduledTask):
+    def __eq__(self, other):
         return self.next_trigger_t == other.next_trigger_t
 
     def update(self, reader : Connector, 
