@@ -5,12 +5,12 @@ connector:
       - reader
       - writer
     params:
-      datasource_url: http://192.168.235.26:8427/
+      datasource_url: http://localhost:8427/
       multi_tenant: true
       user_query: vmselect
-      pwd_query: MZf8x593u
+      pwd_query: pwd
       user_insert: vminsert
-      pwd_insert: K4OQS0ieqT
+      pwd_insert: pwd
   # - name: mq-pulsar
   #   class: Pulsar
   #   pipeline: writer
