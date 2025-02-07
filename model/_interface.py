@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 from typing import Any, Dict, List, Tuple
 import pandas as pd
+import copy
 
 class InferResult():
 
@@ -19,7 +20,7 @@ class InferResult():
         self.data = pd.DataFrame(columns=column, data=zip(*data))
         self.series_id = series_id
 
-    def to_metrics(self, metrics_prefix : str, query_name : str, series_id : str, query_labels : dict) -> Tuple[List[str],List[Dict[str,str]],List[Dict[str,str]]]:
+    def to_metrics(self, metrics_prefix : str, query_name : str, query_labels : dict) -> Tuple[List[str],List[Dict[str,str]],List[Dict[str,str]]]:
         '''
         return:
             [metrics_1, ...], [{timestamp_unix_seconds: value}, ...], [{label: value}, ...]
@@ -39,7 +40,20 @@ class InferResult():
         query_labels['__for'] = query_name
         labels = [query_labels] * len(metrics_names)
         return metrics_names, values, labels
-
+    
+    def to_metrics_prom(self, metrics_prefix : str, query_labels : dict) -> Dict:
+        result = {"data": {"result": []}}
+        for column in self.data.columns:
+            if str(column) in ['ds']:
+                continue
+            metrics_name = metrics_prefix + "_" + column
+            labels = copy.deepcopy(query_labels)
+            labels["__name__"] = metrics_name
+            ts_sec = self.data['ds'].astype('int64').divide(1e9)
+            value = self.data[column]
+            to_write = [[k,str(v)] for k,v in zip(ts_sec, value)]
+            result["data"]["result"].append({"metric": labels, "values": to_write})
+        return result
 
 class BaseModel(metaclass=ABCMeta):
     """
@@ -48,6 +62,8 @@ class BaseModel(metaclass=ABCMeta):
         - instance 1 (argument set 1)
         - instance 2 (argument set 2)
         - ...
+
+    [IMPORTANT] the implementation should implement a '__json__' method to enable json serialization
     """
     @abstractmethod
     def check_args(self, args : dict[str,Any]) -> bool:
@@ -83,4 +99,18 @@ class BaseModel(metaclass=ABCMeta):
         instance: instance id
         y: {series_id: Dataframe{columns=[ts,value,...]}}  ts: 'yyyy-MM-dd HH:mm:ss'  value: float
         '''
-        return True
+        return False
+    
+    @abstractmethod
+    def save_checkpoint(self) -> bool:
+        '''
+        save checkpoint, called by scheduler
+        '''
+        return False
+    
+    @abstractmethod
+    def load_checkpoint(self) -> bool:
+        '''
+        load checkpoint, called by scheduler
+        '''
+        return False

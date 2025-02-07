@@ -6,7 +6,7 @@ import flask
 import os
 import yaml
 import common
-import time
+import uuid
 import logging
 import sys
 
@@ -80,6 +80,9 @@ def resume_task():
 def __add_scheduled_task(task, tenant) -> bool:
     if task['model_name'] not in models:
         return False
+    if not check_submit(task):
+        logger.warning("Bad configuration: tenant = %s, task = %s", tenant, task['name'])
+        return False
     # get model object
     model = models[task['model_name']]
     # schedule
@@ -92,6 +95,24 @@ def __add_scheduled_task(task, tenant) -> bool:
                                                 query={task['query_name']:task['query_args']},
                                                 args=task['scheduler_args']) 
     return True
+
+def __submit_once_task(task, tenant) -> Any:
+    if task['model_name'] not in models:
+        return 'Invalid model'
+    if not check_submit(task):
+        logger.warning("Bad configuration: tenant = %s, task = %s", tenant, task['name'])
+        return 'parameters check failed'
+    # get model object
+    model = models[task['model_name']]
+    # submit
+    schedulers['once'].schedule(name = "", tenant = str(tenant),
+                                        reader=readers[task['reader_name']], 
+                                        writer=writers[task['writer_name']],
+                                        model=model, 
+                                        model_args=task['model_args'],
+                                        query={task['query_name']:task['query_args']},
+                                        args=task['scheduler_args'])
+    return common.threadlocal.result
 
 @app.route('/submit/<int:tenant>', methods=['POST'])
 def submit_task(tenant : int):
@@ -133,3 +154,19 @@ def stop_task(tenant : int):
     if os.path.isfile(task_file):
         os.remove(task_file)
     return 'success'
+
+@app.route('/test/<int:tenant>', methods=['POST'])
+def test_task(tenant : int):
+    task = {}
+    task['name'] = "test_" + str(uuid.uuid4()) # str
+    task['reader_name'] = request.json.get('reader') # str
+    task['writer_name'] = request.json.get('writer') # str
+    task['model_name'] = request.json.get('model')   # str
+    task['model_args'] = request.json.get('model_args') # dict
+    task['scheduler_name'] = 'once'  # str
+    task['scheduler_args'] = request.json.get('scheduler_args')   # dict
+    task['query_name'] = request.json.get('query_name')   # str
+    task['query_args'] = request.json.get('query_args')   # dict
+    if not check_submit(task):
+        return flask.abort(400, "bad configuration !")
+    return __submit_once_task(task, tenant)

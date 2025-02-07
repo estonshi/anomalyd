@@ -2,11 +2,14 @@ import sys
 import os
 import hashlib
 import re
+import time
+import threading
 
 home_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 task_folder = None
 model_folder = None
 output_metrics_prefix = "_model_output"
+threadlocal = threading.local()
 
 def check_home_folder(specified_home_folder = None):
     global home_folder, task_folder, model_folder
@@ -55,3 +58,8 @@ def default_time_window(whole_period : str, points : int) -> str:
     if window_sec <= 0:
         window_sec = 1
     return str(window_sec) + "s"
+
+def get_model_checkpoint_path(tenant : int, task_name : str) -> str:
+    tenant_dir_list = os.path.join(model_folder, str(tenant))
+    ts = str(int(time.time()))
+    return os.path.join(tenant_dir_list, task_name + "_" + ts + ".checkpoint")

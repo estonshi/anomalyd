@@ -3,8 +3,8 @@ import argparse
 import logging
 import sys
 
-from connector import *
 from model import *
+from connector import *
 import handler
 from scheduler import *
 
@@ -39,7 +39,8 @@ if __name__ == "__main__":
     for m in configs['model']:
         models[m['name']] = globals()[m['class']]()
     for sch in configs['scheduler']:
-        schedulers[sch['name']] = globals()[sch['class']]()
+        schedulers[sch['name']] = globals()[sch['class']](**sch['params'])
+    schedulers['once'] = globals()['Once']()
 
     handler.init_global_configs(args.home, reader=readers, writer=writers, model=models, scheduler = schedulers)
     handler.resume_task()

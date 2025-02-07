@@ -1,6 +1,8 @@
 import sys
 import model._interface as _interface
 import uuid
+import random
+import threading
 from typing import Any, Dict, List, Tuple
 from prophet import Prophet
 
@@ -11,6 +13,8 @@ sys.path.append("..")
 logger = logging.getLogger(__name__)
 
 class ProphetModel(_interface.BaseModel):
+
+    lock = threading.Lock()
 
     def __init__(self) -> None:
         # {instance_id : {series_id : model instance}}
@@ -36,6 +40,11 @@ class ProphetModel(_interface.BaseModel):
             del self.instances[instance_id]
         if instance_id in self.instances_args:
             del self.instances_args[instance_id]
+        # 20% probability to copy to a new dict
+        if random.randint(1, 100) > 80:
+            with ProphetModel.lock:
+                self.instances = dict(self.instances)
+                self.instances_args = dict(self.instances_args)
         return True
     
     def infer(self, instance : str, y : Dict[str, pd.DataFrame]) -> Dict[str, _interface.InferResult]:
@@ -58,7 +67,7 @@ class ProphetModel(_interface.BaseModel):
         return result_map
 
     def __evaluate_anomaly_score(self, predicted : pd.DataFrame, y : pd.DataFrame) -> List[float]:
-        score = 2*(y['y']-predicted['yhat']).abs()/(predicted['yhat_upper']-predicted['yhat_lower'])
+        score = 2*(y['y']-predicted['yhat'])/(predicted['yhat_upper']-predicted['yhat_lower'])
         return list(score)
     
     def fit(self, instance : str, y : Dict[str, pd.DataFrame]) -> bool:
@@ -79,3 +88,8 @@ class ProphetModel(_interface.BaseModel):
                 return False
         return True
             
+    def save_checkpoint(self) -> bool:
+        return False
+
+    def load_checkpoint(self) -> bool:
+        return False

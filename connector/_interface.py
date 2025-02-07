@@ -15,13 +15,13 @@ class Connector(metaclass=ABCMeta):
     def check_query_args(self, args : dict[str,Any]):
         '''
         Must contain 'queries' args
-        Optional 'sampling_period', 'query_length' args
+        Optional 'sampling_period_fit', 'sampling_period_infer' args
         '''
         if not args.__contains__('queries'):
             return False
-        if 'sampling_period' in args and not common.check_time_range_str(args['sampling_period']):
+        if 'sampling_period_fit' in args and not common.check_time_range_str(args['sampling_period_fit']):
             return False
-        if 'query_length' in args and not common.check_time_range_str(args['query_length']):
+        if 'sampling_period_infer' in args and not common.check_time_range_str(args['sampling_period_infer']):
             return False
         return True
 
